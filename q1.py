@@ -109,8 +109,8 @@ M01 = mr.TransInv(M0) @ M1
 M12 = mr.TransInv(M1) @ M2
 M23 = mr.TransInv(M2) @ M3
 
-steps = 640
-dt = 1 / 30.0
+steps = 500
+dt = 1 / 60.0
 T = (steps - 1) * dt
 
 S1 = np.array([ 0, 0, 1,   0, 0, 0 ])
