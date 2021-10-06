@@ -33,9 +33,11 @@ m2 = 2.0        # kg
 I1 = 2.0        # kg m^2
 I2 = 1.0        # kg m^2
 
+# End-effector inertias
 G1 = np.diag([0, 0, I1, m1, m1, m1])
 G2 = np.diag([0, 0, I2, m2, m2, m2])
 
+# Zero pose of frame at space frames
 C0 = np.array([
     [ 1, 0, 0, 0 ],
     [ 0, 1, 0, 0 ],
@@ -43,6 +45,7 @@ C0 = np.array([
     [ 0, 0, 0, 1 ]
 ])
 
+# Zero pose of frame at joint 1
 C1 = np.array([
     [ 1, 0, 0, L1 ],
     [ 0, 1, 0,  0 ],
@@ -50,6 +53,7 @@ C1 = np.array([
     [ 0, 0, 0,  1 ]
 ])
 
+# Zero pose of frame at joint 2
 C2 = np.array([
     [ 1, 0, 0, L1 + L2 ],
     [ 0, 1, 0,       0 ],
@@ -57,6 +61,7 @@ C2 = np.array([
     [ 0, 0, 0,       1 ]
 ])
 
+# Zero pose of space frame
 M0 = np.array([
     [ 1, 0, 0, 0 ],
     [ 0, 1, 0, 0 ],
@@ -64,6 +69,7 @@ M0 = np.array([
     [ 0, 0, 0, 1 ]
 ])
 
+# Zero pose of centre of mass 1
 M1 = np.array([
     [ 1, 0, 0, L1 / 2 ],
     [ 0, 1, 0,      0 ],
@@ -71,6 +77,7 @@ M1 = np.array([
     [ 0, 0, 0,      1 ]
 ])
 
+# Zero pose of centre of mass 2
 M2 = np.array([
     [ 1, 0, 0, L1 + L2 / 2 ],
     [ 0, 1, 0,           0 ],
@@ -78,6 +85,7 @@ M2 = np.array([
     [ 0, 0, 0,           1 ]
 ])
 
+# Zero pose of body frame
 M3 = np.array([
     [ 1, 0, 0, L1 + L2 ],
     [ 0, 1, 0,       0 ],
@@ -85,6 +93,7 @@ M3 = np.array([
     [ 0, 0, 0,       1 ]
 ])
 
+# Generate frame-to-frame transformations
 M01 = mr.TransInv(M0) @ M1
 M12 = mr.TransInv(M1) @ M2
 M23 = mr.TransInv(M2) @ M3
@@ -93,12 +102,18 @@ steps = 900
 dt = 1 / 60.0
 T = (steps - 1) * dt
 
+# Screw Axes
 S1 = np.array([ 0, 0, 1,   0, 0, 0 ])
 S2 = np.array([ 0, 0, 1, 0, -L1, 0 ])
+
+# Screw Axes relative to frame Mi
 A1 = mr.Adjoint(mr.TransInv(M1)) @ S1
 A2 = mr.Adjoint(mr.TransInv(M2)) @ S2
 
+# Gravity
 g = np.array([0, -9.8, 0])
+
+# List of constants to pass into algorithm
 Mlist = np.array([M01, M12, M23])
 Glist = np.array([G1, G2])
 Slist = np.array([S1, S2]).T
@@ -126,6 +141,9 @@ def MassMatrix(thetalist, Mlist, Glist, S):
     return D    
 
 def VelQuadraticForces(thetalist, dthetalist, Mlist, Glist, Slist):
+    """
+    Calculate the velocity quadratic forces
+    """
     n = len(thetalist)
     # Set joint acceleration, end-effector wrench and gravity to zero
     ddthetalist = [0] * n
@@ -136,6 +154,9 @@ def VelQuadraticForces(thetalist, dthetalist, Mlist, Glist, Slist):
     return hlist
 
 def GravityForces(thetalist, g, Mlist, Glist, Slist):
+    """
+    Calculate the gravity forces
+    """
     n = len(thetalist)
     # Set joint velocity, joint acceleration, and end-effector wrench to zero.
     dthetalist = [0] * n
@@ -146,6 +167,9 @@ def GravityForces(thetalist, g, Mlist, Glist, Slist):
     return glist
 
 def EndEffectorForces(thetalist, Ftip, Mlist, Glist, Slist):
+    """
+    Calculate end-effector forces
+    """
     n = len(thetalist)
     # Set joint velocity, joint acceleration and gravity to zero
     dthetalist = [0] * n
@@ -156,6 +180,9 @@ def EndEffectorForces(thetalist, Ftip, Mlist, Glist, Slist):
     return tautiplist
 
 def ForwardDynamics(thetalist, dthetalist, taulist, g, Ftip, Mlist, Glist, Slist):
+    """
+    Calculate joint acceleration
+    """
     Dmat =  MassMatrix(thetalist, Mlist, Glist, Slist)
     clist = VelQuadraticForces(thetalist, dthetalist, Mlist, Glist, Slist)
     glist = GravityForces(thetalist, g, Mlist, Glist, Slist)
@@ -186,7 +213,9 @@ def SimulatePID(theta0list, dtheta0list, thetalistd, dthetalistd, g, Ftipmat, Ml
         de = dthetalistd - dthetamat[i, :]
         taulist = GetPID(Kp, Ki, Kd, e, eint, de, dt)
         ddthetalist = ForwardDynamics(thetamat[i, :], dthetamat[i, :], taulist, g, Ftipmat[:, i], Mlist, Glist, Slist)
+        # One euler step
         thetamat[i + 1, :], dthetamat[i + 1, :] = EulerStep(thetamat[i, :], dthetamat[i, :], ddthetalist, dt)
+        # Change angles to lie between -pi and pi
         thetamat[i + 1, :] = -((pi - thetamat[i + 1, :]) % (2.0 * pi) - pi)
         
     return thetamat, dthetamat
@@ -253,6 +282,7 @@ anim = FuncAnimation(fig, animate, frames=steps, interval=FPS, blit=True)
 FFwriter = animation.FFMpegWriter(FPS, extra_args=['-vcodec', 'h264'])
 anim.save(str(FPS) + '_fps.mp4', writer=FFwriter)
 
+# Setup data for plotting
 theta1 = thetamat[:, 0]
 theta2 = thetamat[:, 1]
 dtheta1 = dthetamat[:, 0]
